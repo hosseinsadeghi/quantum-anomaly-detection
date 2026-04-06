@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "quantum-anomaly-detection"
+version = "0.1.0"
+description = "Quantum computing approaches to anomaly detection across tabular, time series, image, and graph data"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Hossein Sadeghi", email = "hosseinsadeghiesfahani@gmail.com" },
+]
+
+dependencies = [
+    "qiskit>=2.3,<3",
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "scikit-learn>=1.5",
+    "pandas>=2.0",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "jupyter>=1.0",
+    "notebook>=7.0",
+    "ipykernel>=6.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quantum_anomaly_detection"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
