@@ -37,6 +37,20 @@ class TestQuantumKernel:
         eigenvalues = np.linalg.eigvalsh(K)
         assert np.all(eigenvalues > -1e-8)
 
+    def test_identical_points_have_kernel_one(self):
+        """K(x, x) = 1 for any x (self-fidelity is always 1)."""
+        fm = build_zz_feature_map(3)
+        from quantum_anomaly_detection.methods.quantum_kernel import compute_kernel_entry
+        x = np.array([0.5, 1.0, 1.5])
+        assert abs(compute_kernel_entry(x, x, fm) - 1.0) < 1e-6
+
+    def test_rectangular_kernel_matrix(self, small_data):
+        """K(X, Y) should have shape (len(X), len(Y))."""
+        X, _ = small_data
+        fm = build_zz_feature_map(4)
+        K = compute_kernel_matrix(X[:5], fm, Y=X[5:10])
+        assert K.shape == (5, 5)
+
 
 class TestVQCAutoencoder:
     def test_training_runs(self):
@@ -71,6 +85,17 @@ class TestQuantumDistance:
         scores = knn_anomaly_score(D, k=2)
         assert scores.shape == (3,)
         assert np.all(scores >= 0)
+
+    def test_outlier_has_highest_knn_score(self):
+        """A point far from others should have the highest k-NN anomaly score."""
+        D = np.array([
+            [0.0, 0.1, 0.1, 5.0],
+            [0.1, 0.0, 0.1, 5.0],
+            [0.1, 0.1, 0.0, 5.0],
+            [5.0, 5.0, 5.0, 0.0],  # outlier
+        ])
+        scores = knn_anomaly_score(D, k=2)
+        assert np.argmax(scores) == 3
 
 
 class TestQAOAClustering:

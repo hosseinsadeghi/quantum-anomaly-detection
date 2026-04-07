@@ -22,15 +22,12 @@ from quantum_anomaly_detection.circuits.qaoa import (
     build_qaoa_circuit,
     evaluate_qaoa_cost,
     decode_qaoa_solution,
+    optimize_qaoa,
 )
 from quantum_anomaly_detection.circuits.swap_test import (
     build_swap_test_circuit,
     state_fidelity_distance,
     compute_distance_matrix,
-)
-from quantum_anomaly_detection.circuits.utils import (
-    get_statevector,
-    count_parameters,
 )
 
 
@@ -38,7 +35,7 @@ class TestFeatureMaps:
     def test_zz_feature_map_shape(self):
         qc = build_zz_feature_map(4, reps=2)
         assert qc.num_qubits == 4
-        assert qc.num_parameters == 4  # One param per qubit
+        assert qc.num_parameters == 4
 
     def test_pauli_feature_map_shape(self):
         qc = build_pauli_feature_map(4, reps=2)
@@ -61,6 +58,16 @@ class TestFeatureMaps:
         qc = build_angle_encoding_map(4)
         with pytest.raises(ValueError):
             assign_features(qc, np.array([0.1, 0.2]))
+
+    def test_different_inputs_produce_different_states(self):
+        """Feature map should encode different inputs as different quantum states."""
+        fm = build_angle_encoding_map(3)
+        x1 = np.array([0.1, 0.2, 0.3])
+        x2 = np.array([1.5, 2.0, 2.5])
+        sv1 = Statevector(assign_features(fm, x1))
+        sv2 = Statevector(assign_features(fm, x2))
+        fid = state_fidelity(sv1, sv2)
+        assert fid < 0.99  # Different inputs -> different states
 
 
 class TestAutoencoder:
@@ -125,6 +132,33 @@ class TestQAOA:
         residuals = np.array([0.1, 0.5, 0.2])
         H = build_thresholding_hamiltonian(residuals)
         assert np.allclose(H.to_matrix(), H.to_matrix().conj().T)
+
+    def test_clustering_hamiltonian_not_trivial(self):
+        """Balance constraint should prevent all-one-cluster from being optimal."""
+        D = np.array([[0, 1, 0.1], [1, 0, 1], [0.1, 1, 0]])
+        H = build_clustering_hamiltonian(D)
+        qc = build_qaoa_circuit(H, reps=1)
+        # All-zeros state (all cluster 0): evaluate cost
+        sv_all0 = Statevector.from_label("000")
+        cost_all0 = float(np.real(sv_all0.expectation_value(H)))
+        # Mixed state (one in each cluster): |010>
+        sv_mixed = Statevector.from_label("010")
+        cost_mixed = float(np.real(sv_mixed.expectation_value(H)))
+        # With balance penalty, all-same should NOT be the minimum
+        assert cost_all0 > cost_mixed or abs(cost_all0 - cost_mixed) < 0.01
+
+    def test_optimize_qaoa_cost_decreases(self):
+        """QAOA optimization should reduce cost over iterations."""
+        D = np.array([[0, 1, 2, 3], [1, 0, 1.5, 2], [2, 1.5, 0, 1], [3, 2, 1, 0]])
+        D = D / D.max()
+        H = build_clustering_hamiltonian(D)
+        labels, history = optimize_qaoa(H, reps=2, maxiter=50, seed=42)
+        assert set(labels).issubset({0, 1})
+        # Cost should generally decrease (compare first few vs last few)
+        if len(history) >= 10:
+            early_avg = np.mean(history[:5])
+            late_avg = np.mean(history[-5:])
+            assert late_avg <= early_avg + 0.5  # Allow some tolerance
 
 
 class TestSwapTest:

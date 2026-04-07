@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 from sklearn.datasets import fetch_kddcup99
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, LabelEncoder
-from sklearn.decomposition import PCA
+from sklearn.preprocessing import LabelEncoder
 
 
 def load_kdd_cup(
@@ -44,19 +43,8 @@ def preprocess_graph_features(
     fit_data: np.ndarray | None = None,
 ) -> np.ndarray:
     """StandardScaler + PCA, then scale to [0, pi]."""
-    source = fit_data if fit_data is not None else X
-
-    scaler = StandardScaler()
-    scaler.fit(source)
-    X_scaled = scaler.transform(X)
-
-    pca = PCA(n_components=n_components)
-    pca.fit(scaler.transform(source))
-    X_pca = pca.transform(X_scaled)
-
-    minmax = MinMaxScaler(feature_range=(0, np.pi))
-    minmax.fit(pca.transform(scaler.transform(source)))
-    return minmax.transform(X_pca)
+    from quantum_anomaly_detection.data.preprocessing import scale_to_quantum_range
+    return scale_to_quantum_range(X, n_components=n_components, fit_data=fit_data)
 
 
 def build_adjacency_from_features(

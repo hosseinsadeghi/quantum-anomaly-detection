@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 from sklearn.datasets import fetch_openml
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.decomposition import PCA
 
 
 def load_mnist_anomaly(
@@ -46,21 +44,11 @@ def preprocess_images(
     n_components: int = 8,
     fit_data: np.ndarray | None = None,
 ) -> np.ndarray:
-    """PCA reduction from 784 dims to n_components, then scale to [0, pi]."""
-    source = fit_data if fit_data is not None else X
+    """Normalize pixels to [0,1], then PCA + scale to [0, pi]."""
+    from quantum_anomaly_detection.data.preprocessing import scale_to_quantum_range
 
-    # Normalize pixel values to [0, 1] first
+    source = fit_data if fit_data is not None else X
     X_norm = X / 255.0
     source_norm = source / 255.0
-
-    scaler = StandardScaler()
-    scaler.fit(source_norm)
-    X_scaled = scaler.transform(X_norm)
-
-    pca = PCA(n_components=n_components)
-    pca.fit(scaler.transform(source_norm))
-    X_pca = pca.transform(X_scaled)
-
-    minmax = MinMaxScaler(feature_range=(0, np.pi))
-    minmax.fit(pca.transform(scaler.transform(source_norm)))
-    return minmax.transform(X_pca)
+    fit = source_norm if fit_data is not None else None
+    return scale_to_quantum_range(X_norm, n_components=n_components, fit_data=fit)

@@ -1,4 +1,9 @@
-"""Quantum feature maps for data encoding into quantum states."""
+"""Quantum feature maps for encoding classical data into quantum states.
+
+Each feature map takes an n-dimensional classical vector x and produces an
+n-qubit quantum state |phi(x)>. The choice of feature map determines the
+geometry of the quantum feature space and affects kernel-based methods.
+"""
 
 from __future__ import annotations
 
@@ -10,9 +15,14 @@ from qiskit.circuit.library import zz_feature_map, pauli_feature_map
 def build_zz_feature_map(
     n_qubits: int, reps: int = 2, entanglement: str = "full"
 ) -> QuantumCircuit:
-    """Build ZZ feature map using Qiskit library function.
+    """ZZ feature map: Hadamard + single-qubit Z rotations + ZZ entangling rotations.
 
-    Encodes classical data x as: U_ZZ(x) = prod_k [ H^n * exp(i * sum phi(x) ZZ) ]
+    Each layer applies H gates, then Rz(x_i) on each qubit, then Rzz(x_i * x_j)
+    on entangled pairs. The 'full' entanglement connects all qubit pairs, making
+    the kernel sensitive to all pairwise feature interactions.
+
+    With 'full' entanglement and 2 reps, this creates a rich feature space that
+    can capture non-linear correlations between input features.
     """
     return zz_feature_map(n_qubits, reps=reps, entanglement=entanglement)
 
@@ -23,9 +33,12 @@ def build_pauli_feature_map(
     paulis: list[str] | None = None,
     entanglement: str = "full",
 ) -> QuantumCircuit:
-    """Build Pauli feature map using Qiskit library function.
+    """Generalized Pauli feature map with configurable rotation gates.
 
-    Generalizes ZZ feature map to arbitrary Pauli rotations.
+    Extends the ZZ feature map by allowing arbitrary Pauli rotation types
+    (e.g., ["Z", "ZZ", "ZZZ"] for up to 3-body interactions). Higher-order
+    Pauli terms capture more complex feature correlations at the cost of
+    deeper circuits.
     """
     kwargs = {"reps": reps, "entanglement": entanglement}
     if paulis is not None:
@@ -34,26 +47,24 @@ def build_pauli_feature_map(
 
 
 def build_angle_encoding_map(n_qubits: int) -> QuantumCircuit:
-    """Hand-built angle encoding: H layer + Ry(x_i) on each qubit + CX entanglement.
+    """Hand-built angle encoding feature map.
 
-    This is a simple, transparent feature map built gate-by-gate.
+    Architecture: H -> Ry(x_i) -> linear CX chain -> Rz(x_i)
+
+    The Hadamard layer creates superposition, Ry rotations encode feature
+    values as angles on the Bloch sphere, CX gates entangle neighboring qubits,
+    and final Rz rotations add a second encoding dimension per qubit.
+    This is deliberately simple and transparent for educational purposes.
     """
     x = ParameterVector("x", n_qubits)
     qc = QuantumCircuit(n_qubits, name="AngleEncoding")
 
-    # Hadamard layer
     for i in range(n_qubits):
         qc.h(i)
-
-    # Rotation layer
     for i in range(n_qubits):
         qc.ry(x[i], i)
-
-    # Entanglement layer (linear CX chain)
     for i in range(n_qubits - 1):
         qc.cx(i, i + 1)
-
-    # Second rotation layer
     for i in range(n_qubits):
         qc.rz(x[i], i)
 
@@ -61,7 +72,11 @@ def build_angle_encoding_map(n_qubits: int) -> QuantumCircuit:
 
 
 def assign_features(circuit: QuantumCircuit, x: np.ndarray) -> QuantumCircuit:
-    """Bind feature vector x to a parameterized feature map circuit."""
+    """Bind a classical feature vector to a parameterized feature map circuit.
+
+    Returns a fully bound circuit with no free parameters, ready for
+    statevector simulation.
+    """
     params = list(circuit.parameters)
     if len(params) != len(x):
         raise ValueError(f"Feature map has {len(params)} params, got {len(x)} features")

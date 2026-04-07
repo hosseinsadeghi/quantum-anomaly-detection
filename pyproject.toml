@@ -28,6 +28,7 @@ dev = [
     "jupyter>=1.0",
     "notebook>=7.0",
     "ipykernel>=6.0",
+    "jupyterlab>=4.5",
 ]
 
 [tool.hatch.build.targets.wheel]

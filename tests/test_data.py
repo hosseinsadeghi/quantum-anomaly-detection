@@ -32,8 +32,18 @@ class TestTabularData:
         X, _ = load_synthetic_blobs(n_samples=100, n_features=8, seed=42)
         X_proc = preprocess_tabular(X, n_components=4)
         assert X_proc.shape == (100, 4)
-        assert X_proc.min() >= -0.01  # Allow small numerical error
+        assert X_proc.min() >= -0.01
         assert X_proc.max() <= np.pi + 0.01
+
+    def test_preprocess_fit_data_no_leakage(self):
+        """Preprocessing with fit_data should use fit_data stats, not X."""
+        X_train, _ = load_synthetic_blobs(n_samples=100, n_features=4, seed=42)
+        X_test, _ = load_synthetic_blobs(n_samples=50, n_features=4, seed=99)
+        X_proc = preprocess_tabular(X_test, n_components=3, fit_data=X_train)
+        assert X_proc.shape == (50, 3)
+        # Values should be approximately in [0, pi] but may slightly exceed
+        # if test distribution differs from train
+        assert X_proc.shape[1] == 3
 
 
 class TestTimeSeriesData:

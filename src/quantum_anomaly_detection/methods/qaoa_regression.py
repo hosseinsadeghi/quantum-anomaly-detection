@@ -7,14 +7,11 @@ to solve the binary thresholding problem (which points are anomalies?).
 from __future__ import annotations
 
 import numpy as np
-from scipy.optimize import minimize
 from sklearn.linear_model import LinearRegression, Ridge
 
 from quantum_anomaly_detection.circuits.qaoa import (
     build_thresholding_hamiltonian,
-    build_qaoa_circuit,
-    evaluate_qaoa_cost,
-    decode_qaoa_solution,
+    optimize_qaoa,
 )
 
 
@@ -34,7 +31,6 @@ def fit_regression(
     y_pred = model.predict(X)
     residuals = np.abs(y - y_pred)
 
-    # If y is multi-dimensional, take mean residual per sample
     if residuals.ndim > 1:
         residuals = residuals.mean(axis=1)
 
@@ -60,26 +56,10 @@ def run_qaoa_thresholding(
 
     Returns (anomaly_labels, cost_history).
     """
-    # Normalize residuals
     if residuals.max() > 0:
         residuals_norm = residuals / residuals.max()
     else:
         residuals_norm = residuals
 
     cost_op = build_thresholding_hamiltonian(residuals_norm, penalty=penalty)
-    circuit = build_qaoa_circuit(cost_op, reps=reps)
-
-    rng = np.random.default_rng(seed)
-    x0 = rng.uniform(-np.pi, np.pi, size=circuit.num_parameters)
-
-    cost_history = []
-
-    def cost_fn(params):
-        val = evaluate_qaoa_cost(params, circuit, cost_op)
-        cost_history.append(val)
-        return val
-
-    result = minimize(cost_fn, x0, method="COBYLA", options={"maxiter": maxiter})
-
-    labels = decode_qaoa_solution(result.x, circuit)
-    return labels, cost_history
+    return optimize_qaoa(cost_op, reps=reps, maxiter=maxiter, seed=seed)

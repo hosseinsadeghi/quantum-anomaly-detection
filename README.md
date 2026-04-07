@@ -7,7 +7,7 @@ All quantum circuits are built manually at gate level using [Qiskit](https://qis
 ## Quantum Methods
 
 ### Quantum Kernel + One-Class SVM
-Encodes classical data into quantum states via parameterized feature maps (ZZ, Pauli). The quantum kernel matrix K(x_i, x_j) = |&lt;phi(x_i)|phi(x_j)&gt;|^2 is computed using statevector fidelity, then fed to a One-Class SVM for anomaly detection.
+Encodes classical data into quantum states via parameterized feature maps (ZZ, Pauli). The quantum kernel matrix K(x_i, x_j) = |<phi(x_i)|phi(x_j)>|^2 is computed using statevector fidelity, then fed to a One-Class SVM for anomaly detection.
 
 ### Variational Quantum Circuit Autoencoder
 A parameterized quantum circuit compresses n qubits into n_latent qubits. The "trash qubit" approach measures reconstruction quality: if compression is successful, trash qubits collapse to |0...0>. Loss = 1 - P(trash = |0>). Trained with `scipy.optimize`.
@@ -19,7 +19,7 @@ Formulates 2-cluster partitioning as a QUBO problem: H = sum D[i,j]/2 * (I - Z_i
 Fits a classical regression model, then uses QAOA to solve a binary thresholding optimization — deciding which points with large residuals should be classified as anomalies.
 
 ### Quantum Distance Estimation
-Computes pairwise distances between quantum-encoded data points using state fidelity: d(x_1, x_2) = sqrt(1 - |&lt;phi(x_1)|phi(x_2)&gt;|^2). A k-nearest-neighbor scoring scheme then identifies anomalies as points far from their neighbors.
+Computes pairwise distances between quantum-encoded data points using state fidelity: d(x_1, x_2) = sqrt(1 - |<phi(x_1)|phi(x_2)>|^2). A k-nearest-neighbor scoring scheme then identifies anomalies as points far from their neighbors.
 
 ## Classical Benchmarks
 

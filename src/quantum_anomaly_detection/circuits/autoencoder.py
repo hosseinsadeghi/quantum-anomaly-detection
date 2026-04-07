@@ -8,7 +8,7 @@ qubits end up in state |0...0>. Reconstruction loss = 1 - P(trash = |0...0>).
 from __future__ import annotations
 
 import numpy as np
-from qiskit.circuit import Parameter, ParameterVector, QuantumCircuit
+from qiskit.circuit import ParameterVector, QuantumCircuit
 from qiskit.quantum_info import Statevector, partial_trace
 
 

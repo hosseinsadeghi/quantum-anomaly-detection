@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.decomposition import PCA
 from scipy import stats
 
 
@@ -79,6 +77,13 @@ def extract_window_features(window: np.ndarray) -> np.ndarray:
     return np.array(features)
 
 
+def _to_features(X: np.ndarray, n_components: int) -> np.ndarray:
+    """Convert raw windows to feature vectors if needed."""
+    if X.ndim == 2 and X.shape[1] > n_components * 2:
+        return np.array([extract_window_features(w) for w in X])
+    return X
+
+
 def preprocess_timeseries(
     X: np.ndarray,
     n_components: int = 8,
@@ -89,30 +94,10 @@ def preprocess_timeseries(
     If X is 2D with shape (n_samples, window_size), extracts features first.
     If X is already feature vectors, just does PCA + scaling.
     """
-    # Extract features if raw windows
-    if X.ndim == 2 and X.shape[1] > n_components * 2:
-        features = np.array([extract_window_features(w) for w in X])
-    else:
-        features = X
+    from quantum_anomaly_detection.data.preprocessing import scale_to_quantum_range
 
+    features = _to_features(X, n_components)
     source_raw = fit_data if fit_data is not None else X
-    if source_raw.ndim == 2 and source_raw.shape[1] > n_components * 2:
-        source = np.array([extract_window_features(w) for w in source_raw])
-    else:
-        source = source_raw
-
-    scaler = StandardScaler()
-    scaler.fit(source)
-    features_scaled = scaler.transform(features)
-
-    if n_components < features.shape[1]:
-        pca = PCA(n_components=n_components)
-        pca.fit(scaler.transform(source))
-        features_scaled = pca.transform(features_scaled)
-        source_for_minmax = pca.transform(scaler.transform(source))
-    else:
-        source_for_minmax = scaler.transform(source)
-
-    minmax = MinMaxScaler(feature_range=(0, np.pi))
-    minmax.fit(source_for_minmax)
-    return minmax.transform(features_scaled)
+    source_features = _to_features(source_raw, n_components)
+    fit = source_features if fit_data is not None else None
+    return scale_to_quantum_range(features, n_components=n_components, fit_data=fit)

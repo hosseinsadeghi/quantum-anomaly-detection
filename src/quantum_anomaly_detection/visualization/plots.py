@@ -82,13 +82,9 @@ def plot_roc_curves(
     for name, (y_true, scores) in roc_data.items():
         y = np.array(y_true).astype(int)
         s = np.array(scores)
-        # Try both directions
         try:
             fpr, tpr, _ = roc_curve(y, s)
             roc_auc = auc(fpr, tpr)
-            if roc_auc < 0.5:
-                fpr, tpr, _ = roc_curve(y, -s)
-                roc_auc = auc(fpr, tpr)
         except ValueError:
             continue
         ax.plot(fpr, tpr, label=f"{name} (AUC={roc_auc:.3f})")

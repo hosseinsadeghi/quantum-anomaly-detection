@@ -1,20 +1,17 @@
 """QAOA-based clustering for anomaly detection.
 
-Formulates 2-cluster partitioning as QUBO, solves with QAOA,
+Formulates balanced 2-cluster partitioning as QUBO, solves with QAOA,
 then labels small/distant clusters as anomalies.
 """
 
 from __future__ import annotations
 
 import numpy as np
-from scipy.optimize import minimize
 from scipy.spatial.distance import pdist, squareform
 
 from quantum_anomaly_detection.circuits.qaoa import (
     build_clustering_hamiltonian,
-    build_qaoa_circuit,
-    evaluate_qaoa_cost,
-    decode_qaoa_solution,
+    optimize_qaoa,
 )
 
 
@@ -33,30 +30,13 @@ def run_qaoa_clustering(
         seed: Random seed.
 
     Returns (cluster_labels, cost_history).
-    Labels are 0 or 1 for each point.
     """
     distance_matrix = squareform(pdist(X, metric="euclidean"))
-    # Normalize distances for numerical stability
     if distance_matrix.max() > 0:
         distance_matrix = distance_matrix / distance_matrix.max()
 
     cost_op = build_clustering_hamiltonian(distance_matrix)
-    circuit = build_qaoa_circuit(cost_op, reps=reps)
-
-    rng = np.random.default_rng(seed)
-    x0 = rng.uniform(-np.pi, np.pi, size=circuit.num_parameters)
-
-    cost_history = []
-
-    def cost_fn(params):
-        val = evaluate_qaoa_cost(params, circuit, cost_op)
-        cost_history.append(val)
-        return val
-
-    result = minimize(cost_fn, x0, method="COBYLA", options={"maxiter": maxiter})
-
-    labels = decode_qaoa_solution(result.x, circuit)
-    return labels, cost_history
+    return optimize_qaoa(cost_op, reps=reps, maxiter=maxiter, seed=seed)
 
 
 def identify_anomaly_clusters(

@@ -11,40 +11,59 @@ import numpy as np
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import qaoa_ansatz
 from qiskit.quantum_info import SparsePauliOp, Statevector
-from qiskit.primitives import StatevectorEstimator
 
 
-def build_clustering_hamiltonian(distance_matrix: np.ndarray) -> SparsePauliOp:
-    """Build QUBO Hamiltonian for 2-cluster partitioning.
+def build_clustering_hamiltonian(
+    distance_matrix: np.ndarray,
+    balance_weight: float | None = None,
+) -> SparsePauliOp:
+    """Build QUBO Hamiltonian for balanced 2-cluster partitioning.
 
-    For n points with distance matrix D, we assign qubit i to cluster 0 (|0>)
-    or cluster 1 (|1>). Cost minimizes intra-cluster distances:
+    For n points with distance matrix D, qubit i in |0> means cluster 0,
+    |1> means cluster 1. The Hamiltonian has two terms:
 
-        H = sum_{i<j} D[i,j]/2 * (I - Z_i Z_j)
+    1. Separation cost: sum_{i<j} -D[i,j]/2 * Z_i Z_j
+       This is minimized when distant points are in different clusters
+       (Z_i Z_j = -1) and close points are in the same cluster (Z_i Z_j = +1).
 
-    Points in the same cluster (same Z eigenvalue) contribute 0;
-    points in different clusters contribute D[i,j].
-    We minimize this to keep close points together.
+    2. Balance penalty: balance_weight * (sum_i Z_i)^2
+       Penalizes uneven cluster sizes. (sum_i Z_i)^2 expands to
+       n*I + sum_{i!=j} Z_i Z_j, which is minimized when clusters are equal-sized.
+
+    Without the balance penalty, the trivial solution (all in one cluster) is optimal.
+    Default balance_weight = max(D) to make the penalty commensurate with distances.
     """
     n = distance_matrix.shape[0]
+    if balance_weight is None:
+        nonzero = distance_matrix[distance_matrix > 0]
+        balance_weight = float(nonzero.mean()) if len(nonzero) > 0 else 1.0
+
     terms = []
 
+    # Separation cost: -D[i,j]/2 * Z_i Z_j
     for i in range(n):
         for j in range(i + 1, n):
             d = distance_matrix[i, j]
             if abs(d) < 1e-10:
                 continue
-
-            # D[i,j]/2 * I term (constant shift, can include for completeness)
-            label_i = "I" * n
-            terms.append((label_i, d / 2))
-
-            # -D[i,j]/2 * Z_i Z_j term
             label_zz = list("I" * n)
-            # SparsePauliOp uses little-endian: index 0 is rightmost
             label_zz[n - 1 - i] = "Z"
             label_zz[n - 1 - j] = "Z"
             terms.append(("".join(label_zz), -d / 2))
+
+    # Balance penalty: balance_weight * (sum_i Z_i)^2
+    # = balance_weight * (n*I + sum_{i!=j} Z_i Z_j)
+    # The n*I term is a constant shift (omitted).
+    # The Z_i Z_j terms for all i!=j:
+    for i in range(n):
+        for j in range(i + 1, n):
+            label_zz = list("I" * n)
+            label_zz[n - 1 - i] = "Z"
+            label_zz[n - 1 - j] = "Z"
+            terms.append(("".join(label_zz), balance_weight))
+
+    if not terms:
+        terms.append(("I" * n, 0.0))
 
     return SparsePauliOp.from_list(terms).simplify()
 
@@ -55,13 +74,14 @@ def build_thresholding_hamiltonian(
 ) -> SparsePauliOp:
     """Build QUBO Hamiltonian for anomaly thresholding.
 
-    Qubit i = |1> means point i is labeled anomaly.
-    Cost encourages labeling points with large |residual| as anomalies:
+    Qubit i in |0> = normal, |1> = anomaly. Z_i eigenvalue is +1 for |0>, -1 for |1>.
 
-        H = -sum_i |r_i| * Z_i + penalty * sum_{i<j} (1 - Z_i Z_j) / 4
+    H = +sum_i |r_i| * Z_i + penalty * sum_{i<j} (1 - Z_i Z_j) / 4
 
-    The first term rewards labeling high-residual points as anomalies.
-    The penalty term encourages spatial smoothness (nearby points get same label).
+    First term: +|r_i| * Z_i means minimizing H prefers Z_i = -1 (anomaly)
+    when |r_i| is large. Points with small residuals stay normal (Z_i = +1).
+
+    Second term: smoothness penalty encouraging nearby points to share labels.
     """
     n = len(residuals)
     terms = []
@@ -69,10 +89,6 @@ def build_thresholding_hamiltonian(
     for i in range(n):
         label = list("I" * n)
         label[n - 1 - i] = "Z"
-        # Negative sign: minimize H means maximize Z_i for large |r_i|
-        # Z_i = +1 for |0> (normal), Z_i = -1 for |1> (anomaly)
-        # We want anomaly when |r_i| is large, so we use +|r_i| * Z_i
-        # to penalize normal label for large residuals
         terms.append(("".join(label), float(np.abs(residuals[i]))))
 
     # Smoothness penalty
@@ -117,5 +133,32 @@ def decode_qaoa_solution(
     sv = Statevector(bound)
     probs = sv.probabilities_dict()
     best = max(probs, key=probs.get)
-    # Convert bitstring to array (big-endian: leftmost bit = qubit n-1)
     return np.array([int(b) for b in best])
+
+
+def optimize_qaoa(
+    cost_op: SparsePauliOp,
+    reps: int = 2,
+    maxiter: int = 200,
+    seed: int = 42,
+) -> tuple[np.ndarray, list[float]]:
+    """Build and optimize a QAOA circuit for a given cost operator.
+
+    Returns (best_bitstring, cost_history).
+    """
+    from scipy.optimize import minimize as scipy_minimize
+
+    circuit = build_qaoa_circuit(cost_op, reps=reps)
+    rng = np.random.default_rng(seed)
+    x0 = rng.uniform(-np.pi, np.pi, size=circuit.num_parameters)
+
+    cost_history: list[float] = []
+
+    def cost_fn(params):
+        val = evaluate_qaoa_cost(params, circuit, cost_op)
+        cost_history.append(val)
+        return val
+
+    result = scipy_minimize(cost_fn, x0, method="COBYLA", options={"maxiter": maxiter})
+    labels = decode_qaoa_solution(result.x, circuit)
+    return labels, cost_history

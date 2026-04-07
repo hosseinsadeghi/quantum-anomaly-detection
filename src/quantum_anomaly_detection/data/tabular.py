@@ -6,8 +6,6 @@ import numpy as np
 import pandas as pd
 from sklearn.datasets import fetch_openml, make_blobs
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.decomposition import PCA
 
 
 def load_creditcard(
@@ -83,25 +81,5 @@ def preprocess_tabular(
     If fit_data is provided, the scaler/PCA are fit on fit_data and applied to X.
     Otherwise X is used for fitting.
     """
-    source = fit_data if fit_data is not None else X
-
-    scaler = StandardScaler()
-    scaler.fit(source)
-    X_scaled = scaler.transform(X)
-
-    if n_components is not None and n_components < X.shape[1]:
-        pca = PCA(n_components=n_components)
-        pca.fit(scaler.transform(source))
-        X_scaled = pca.transform(X_scaled)
-
-    # Scale to [0, pi]
-    minmax = MinMaxScaler(feature_range=(0, np.pi))
-    if fit_data is not None:
-        source_scaled = scaler.transform(source)
-        if n_components is not None and n_components < source.shape[1]:
-            source_scaled = pca.transform(source_scaled)
-        minmax.fit(source_scaled)
-    else:
-        minmax.fit(X_scaled)
-
-    return minmax.transform(X_scaled)
+    from quantum_anomaly_detection.data.preprocessing import scale_to_quantum_range
+    return scale_to_quantum_range(X, n_components=n_components, fit_data=fit_data)
