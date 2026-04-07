@@ -7,19 +7,29 @@ All quantum circuits are built manually at gate level using [Qiskit](https://qis
 ## Quantum Methods
 
 ### Quantum Kernel + One-Class SVM
-Encodes classical data into quantum states via parameterized feature maps (ZZ, Pauli). The quantum kernel matrix K(x_i, x_j) = |<phi(x_i)|phi(x_j)>|^2 is computed using statevector fidelity, then fed to a One-Class SVM for anomaly detection.
+Encodes classical data into quantum states via parameterized feature maps (ZZ, Pauli). The quantum kernel matrix is computed using statevector fidelity, then fed to a One-Class SVM for anomaly detection.
+
+$$K(x_i, x_j) = \left| \langle \phi(x_i) | \phi(x_j) \rangle \right|^2$$
 
 ### Variational Quantum Circuit Autoencoder
-A parameterized quantum circuit compresses n qubits into n_latent qubits. The "trash qubit" approach measures reconstruction quality: if compression is successful, trash qubits collapse to |0...0>. Loss = 1 - P(trash = |0>). Trained with `scipy.optimize`.
+A parameterized quantum circuit compresses $n$ qubits into $n_{\text{latent}}$ qubits. The "trash qubit" approach measures reconstruction quality: if compression is successful, trash qubits collapse to $|0\rangle$. Trained with `scipy.optimize`.
+
+$$\mathcal{L} = 1 - P\!\left(\text{trash} = |0\ldots0\rangle\right)$$
 
 ### QAOA Clustering
-Formulates 2-cluster partitioning as a QUBO problem: H = sum D[i,j]/2 * (I - Z_i Z_j). The Quantum Approximate Optimization Algorithm finds cluster assignments. Small or isolated clusters are flagged as anomalies.
+Formulates balanced 2-cluster partitioning as a QUBO problem. The Quantum Approximate Optimization Algorithm finds cluster assignments. Small or isolated clusters are flagged as anomalies.
+
+$$H = -\sum_{i<j} \frac{D_{ij}}{2}\, Z_i Z_j \;+\; \lambda \left(\sum_i Z_i\right)^{\!2}$$
 
 ### QAOA Regression Residuals
-Fits a classical regression model, then uses QAOA to solve a binary thresholding optimization — deciding which points with large residuals should be classified as anomalies.
+Fits a classical regression model, then uses QAOA to solve a binary thresholding optimization. The Hamiltonian encourages labeling high-residual points as anomalies:
+
+$$H = \sum_i |r_i|\, Z_i \;+\; \gamma \sum_{i<j} \frac{1 - Z_i Z_j}{4}$$
 
 ### Quantum Distance Estimation
-Computes pairwise distances between quantum-encoded data points using state fidelity: d(x_1, x_2) = sqrt(1 - |<phi(x_1)|phi(x_2)>|^2). A k-nearest-neighbor scoring scheme then identifies anomalies as points far from their neighbors.
+Computes pairwise distances between quantum-encoded data points using state fidelity. A $k$-nearest-neighbor scoring scheme then identifies anomalies as points far from their neighbors.
+
+$$d(x_1, x_2) = \sqrt{1 - \left| \langle \phi(x_1) | \phi(x_2) \rangle \right|^2}$$
 
 ## Classical Benchmarks
 
@@ -133,7 +143,7 @@ All datasets auto-download on first use:
 ## Technical Notes
 
 - **Qubit budget**: Feature maps use 6-8 qubits (one per PCA component). QAOA uses 12-16 qubits (one per data point in subsample). All circuits run on statevector simulation.
-- **Data encoding**: Raw data -> StandardScaler -> PCA -> MinMaxScaler to [0, pi] -> rotation angles in quantum feature maps.
+- **Data encoding**: Raw data $\to$ StandardScaler $\to$ PCA $\to$ MinMaxScaler to $[0, \pi]$ $\to$ rotation angles in quantum feature maps.
 - **Reproducibility**: Each notebook has a `SEED` variable at the top. Change it to observe different results.
 
 ## Dependencies
