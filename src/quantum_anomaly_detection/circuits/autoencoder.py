@@ -95,6 +95,16 @@ def build_autoencoder_circuit(
     return qc
 
 
+def _build_no_barriers(builder, n_qubits, n_latent, reps):
+    """Build encoder/decoder without barriers (needed for to_gate())."""
+    circ = builder(n_qubits, n_latent, reps)
+    clean = QuantumCircuit(n_qubits, name=circ.name)
+    for inst in circ.data:
+        if inst.operation.name != "barrier":
+            clean.append(inst.operation, inst.qubits, inst.clbits)
+    return clean
+
+
 def build_autoencoder_compact(
     n_qubits: int,
     n_latent: int,
@@ -105,21 +115,24 @@ def build_autoencoder_compact(
 
     Returns (compact_circuit, encoder_detail, decoder_detail).
     - compact_circuit: high-level view with Encoder/Decoder as labeled boxes
-    - encoder_detail: the full encoder circuit for separate display
-    - decoder_detail: the full decoder circuit for separate display
+    - encoder_detail: the full encoder circuit (with barriers) for separate display
+    - decoder_detail: the full decoder circuit (with barriers) for separate display
     """
     x = ParameterVector("x", n_qubits)
     encoder = build_encoder(n_qubits, n_latent, encoder_reps)
     decoder = build_decoder(n_qubits, n_latent, decoder_reps)
 
-    # Compact view using to_gate()
+    # Barrier-free versions for to_gate()
+    enc_clean = _build_no_barriers(build_encoder, n_qubits, n_latent, encoder_reps)
+    dec_clean = _build_no_barriers(build_decoder, n_qubits, n_latent, decoder_reps)
+
     qc = QuantumCircuit(n_qubits, name="QAutoencoder")
     for i in range(n_qubits):
         qc.ry(x[i], i)
     qc.barrier()
-    qc.append(encoder.to_gate(label="Encoder"), range(n_qubits))
+    qc.append(enc_clean.to_gate(label="Encoder"), range(n_qubits))
     qc.barrier()
-    qc.append(decoder.to_gate(label="Decoder"), range(n_qubits))
+    qc.append(dec_clean.to_gate(label="Decoder"), range(n_qubits))
 
     return qc, encoder, decoder
 
