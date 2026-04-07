@@ -5,7 +5,7 @@ import pytest
 
 from quantum_anomaly_detection.classical.benchmarks import (
     run_isolation_forest,
-    run_ocsvm,
+    run_svm,
     run_lof,
     run_dbscan,
     run_elliptic_envelope,
@@ -24,7 +24,7 @@ class TestClassicalMethods:
     def test_ocsvm_shape(self, small_data):
         X, _ = small_data
         X_train, X_test = X[:40], X[40:]
-        preds, scores = run_ocsvm(X_train, X_test)
+        preds, scores = run_svm(X_train, X_test)
         assert preds.shape == (10,)
 
     def test_lof_shape(self, small_data):

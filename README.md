@@ -36,7 +36,7 @@ Two levels of comparison:
 
 | Method | Tabular | Time Series | Image | Graph/Network |
 |--------|---------|-------------|-------|---------------|
-| Quantum Kernel + OCSVM | x | x | x | x |
+| Quantum Kernel + One-Class SVM | x | x | x | x |
 | VQC Autoencoder | x | x | x | |
 | QAOA Clustering | x | | | x |
 | QAOA Regression | | x | | |
@@ -53,13 +53,13 @@ src/quantum_anomaly_detection/
         swap_test.py       # Swap test + fidelity-based distance
         utils.py           # Statevector helpers
     methods/           # High-level quantum anomaly detection pipelines
-        quantum_kernel.py      # Kernel matrix + OCSVM
+        quantum_kernel.py      # Kernel matrix + One-Class SVM
         vqc_autoencoder.py     # Training loop + scoring
         qaoa_clustering.py     # QAOA clustering + anomaly labeling
         qaoa_regression.py     # Regression residuals + QAOA thresholding
         quantum_distance.py    # Quantum distance + k-NN scoring
     classical/         # Classical benchmarks
-        benchmarks.py      # IF, OCSVM, LOF, DBSCAN, Elliptic Envelope, SA
+        benchmarks.py      # IF, One-Class SVM, LOF, DBSCAN, Elliptic Envelope, SA
     data/              # Dataset loading & preprocessing
         tabular.py         # Credit card fraud, synthetic blobs
         time_series.py     # Synthetic sensor/ECG data

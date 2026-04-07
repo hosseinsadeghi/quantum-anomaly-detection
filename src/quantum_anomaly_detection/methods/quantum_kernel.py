@@ -48,7 +48,7 @@ def compute_kernel_matrix(
         return K
 
 
-def quantum_kernel_ocsvm(
+def quantum_kernel_svm(
     X_train: np.ndarray,
     X_test: np.ndarray,
     feature_map: QuantumCircuit,

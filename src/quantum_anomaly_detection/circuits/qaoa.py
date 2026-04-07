@@ -17,30 +17,27 @@ def build_clustering_hamiltonian(
     distance_matrix: np.ndarray,
     balance_weight: float | None = None,
 ) -> SparsePauliOp:
-    """Build QUBO Hamiltonian for balanced 2-cluster partitioning.
+    """Build MaxCut-style QUBO Hamiltonian for balanced 2-cluster partitioning.
 
     For n points with distance matrix D, qubit i in |0> means cluster 0,
     |1> means cluster 1. The Hamiltonian has two terms:
 
-    1. Separation cost: sum_{i<j} -D[i,j]/2 * Z_i Z_j
-       This is minimized when distant points are in different clusters
-       (Z_i Z_j = -1) and close points are in the same cluster (Z_i Z_j = +1).
+    1. MaxCut cost: sum_{i<j} +D[i,j]/2 * Z_i Z_j
+       Minimized when Z_i Z_j = -1 (different clusters) for large D[i,j].
+       This places distant points in different clusters.
 
-    2. Balance penalty: balance_weight * (sum_i Z_i)^2
-       Penalizes uneven cluster sizes. (sum_i Z_i)^2 expands to
-       n*I + sum_{i!=j} Z_i Z_j, which is minimized when clusters are equal-sized.
-
-    Without the balance penalty, the trivial solution (all in one cluster) is optimal.
-    Default balance_weight = max(D) to make the penalty commensurate with distances.
+    2. Balance penalty: alpha * (sum_i Z_i)^2
+       Gentle penalty for uneven cluster sizes. Expands to Z_i Z_j terms.
+       Default alpha = mean(D) / (2*n) — weak enough not to override MaxCut.
     """
     n = distance_matrix.shape[0]
     if balance_weight is None:
         nonzero = distance_matrix[distance_matrix > 0]
-        balance_weight = float(nonzero.mean()) if len(nonzero) > 0 else 1.0
+        mean_d = float(nonzero.mean()) if len(nonzero) > 0 else 1.0
+        balance_weight = mean_d / (2 * n)
 
     terms = []
 
-    # Separation cost: -D[i,j]/2 * Z_i Z_j
     for i in range(n):
         for j in range(i + 1, n):
             d = distance_matrix[i, j]
@@ -49,18 +46,8 @@ def build_clustering_hamiltonian(
             label_zz = list("I" * n)
             label_zz[n - 1 - i] = "Z"
             label_zz[n - 1 - j] = "Z"
-            terms.append(("".join(label_zz), -d / 2))
-
-    # Balance penalty: balance_weight * (sum_i Z_i)^2
-    # = balance_weight * (n*I + sum_{i!=j} Z_i Z_j)
-    # The n*I term is a constant shift (omitted).
-    # The Z_i Z_j terms for all i!=j:
-    for i in range(n):
-        for j in range(i + 1, n):
-            label_zz = list("I" * n)
-            label_zz[n - 1 - i] = "Z"
-            label_zz[n - 1 - j] = "Z"
-            terms.append(("".join(label_zz), balance_weight))
+            # MaxCut: +d/2 (positive!), balance: +alpha
+            terms.append(("".join(label_zz), d / 2 + balance_weight))
 
     if not terms:
         terms.append(("I" * n, 0.0))

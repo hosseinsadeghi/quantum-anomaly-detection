@@ -80,21 +80,48 @@ def build_autoencoder_circuit(
     """
     x = ParameterVector("x", n_qubits)
 
-    # Data encoding layer (angle encoding)
+    # Data encoding layer
     qc = QuantumCircuit(n_qubits, name="QAutoencoder")
     for i in range(n_qubits):
         qc.ry(x[i], i)
     qc.barrier()
 
-    # Encoder
+    # Encoder + Decoder (composed inline for parameter binding)
     encoder = build_encoder(n_qubits, n_latent, encoder_reps)
     qc.compose(encoder, inplace=True)
-
-    # Decoder
     decoder = build_decoder(n_qubits, n_latent, decoder_reps)
     qc.compose(decoder, inplace=True)
 
     return qc
+
+
+def build_autoencoder_compact(
+    n_qubits: int,
+    n_latent: int,
+    encoder_reps: int = 2,
+    decoder_reps: int = 2,
+) -> tuple[QuantumCircuit, QuantumCircuit, QuantumCircuit]:
+    """Build autoencoder with sub-circuits shown as named blocks.
+
+    Returns (compact_circuit, encoder_detail, decoder_detail).
+    - compact_circuit: high-level view with Encoder/Decoder as labeled boxes
+    - encoder_detail: the full encoder circuit for separate display
+    - decoder_detail: the full decoder circuit for separate display
+    """
+    x = ParameterVector("x", n_qubits)
+    encoder = build_encoder(n_qubits, n_latent, encoder_reps)
+    decoder = build_decoder(n_qubits, n_latent, decoder_reps)
+
+    # Compact view using to_gate()
+    qc = QuantumCircuit(n_qubits, name="QAutoencoder")
+    for i in range(n_qubits):
+        qc.ry(x[i], i)
+    qc.barrier()
+    qc.append(encoder.to_gate(label="Encoder"), range(n_qubits))
+    qc.barrier()
+    qc.append(decoder.to_gate(label="Decoder"), range(n_qubits))
+
+    return qc, encoder, decoder
 
 
 def reconstruction_loss(

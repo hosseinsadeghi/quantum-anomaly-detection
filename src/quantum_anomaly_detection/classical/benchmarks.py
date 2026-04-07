@@ -27,7 +27,7 @@ def run_isolation_forest(
     return predictions, scores
 
 
-def run_ocsvm(
+def run_svm(
     X_train: np.ndarray,
     X_test: np.ndarray,
     kernel: str = "rbf",
@@ -85,32 +85,30 @@ def run_simulated_annealing(
     cooling_rate: float = 0.995,
     seed: int = 42,
 ) -> tuple[np.ndarray, list[float]]:
-    """Simulated annealing for 2-cluster QUBO (same formulation as QAOA).
+    """Simulated annealing for 2-cluster MaxCut (same objective as QAOA).
 
-    Minimizes the same objective as the QAOA clustering Hamiltonian:
-    sum_{i<j} D[i,j] for pairs in different clusters, plus a balance
-    penalty to prevent trivial all-one-cluster solutions.
+    Minimizes: sum of D[i,j] for pairs in the SAME cluster (MaxCut =
+    maximize cut weight = minimize same-cluster weight), plus a gentle
+    balance penalty.
 
     Returns (cluster_labels, cost_history).
     """
     rng = np.random.default_rng(seed)
     n = cost_matrix.shape[0]
 
-    # Initialize random assignment
     state = rng.integers(0, 2, size=n)
 
-    # Balance penalty: use mean distance as weight to avoid dominating the cost
     nonzero = cost_matrix[cost_matrix > 0]
-    balance_weight = float(nonzero.mean()) if len(nonzero) > 0 else 1.0
+    mean_d = float(nonzero.mean()) if len(nonzero) > 0 else 1.0
+    balance_weight = mean_d / (2 * n)
 
     def compute_cost(s):
         cost = 0.0
         for i in range(n):
             for j in range(i + 1, n):
-                if s[i] != s[j]:
+                if s[i] == s[j]:
                     cost += cost_matrix[i, j]
-        # Balance penalty: (n0 - n1)^2 penalizes uneven clusters
-        n1 = s.sum()
+        n1 = int(s.sum())
         n0 = n - n1
         cost += balance_weight * (n0 - n1) ** 2
         return cost
