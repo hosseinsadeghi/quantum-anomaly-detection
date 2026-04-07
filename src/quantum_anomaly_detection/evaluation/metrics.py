@@ -66,4 +66,6 @@ def format_results_table(results: dict[str, dict]) -> pd.DataFrame:
     """
     df = pd.DataFrame(results).T
     df.index.name = "Method"
-    return df.round(4)
+    df = df.round(4)
+    df = df.fillna("—")
+    return df
