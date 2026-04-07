@@ -28,3 +28,6 @@ Thumbs.db
 
 # Environment
 .env
+
+# Generated reports
+notebooks/results_report.html
